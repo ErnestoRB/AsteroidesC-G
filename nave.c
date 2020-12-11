@@ -4,8 +4,6 @@
         - Ernesto Rodrigo Ramírez Briano
         - Gustavo Emiliano Martinez Luevano
         - Paulina Lizbeth Esparza Jimenez
-
-
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,52 +20,58 @@
 #define KEY_RELEASED 2
 #define OBJETO_MAX 10
 
-
 const int FPS = 60;// FOTOGRAMAS A IMPRIMIR POR SEGUNDO
 
 unsigned char key[ALLEGRO_KEY_MAX];
 char logos[5][100]= {{"resources/menu/logo_asteroides.png"},{"resources/menu/logo_asteroides1.png"},{"resources/menu/logo_asteroides2.png"},{"resources/menu/logo_asteroides3.png"},{"resources/menu/logo_asteroides4.png"}};
-bool done = false, redraw = true, debug=false,hitbox=false;
-bool juego=false;
-ALLEGRO_FONT* font; // fondo default
-ALLEGRO_FONT* font_logo;
+bool ciclar = true/*ciclarmenu?*/, redraw = true/*pedir dibujo?*/, debug=false/* activar cosas de debug ? */,hitbox=false/* mostrar hitboxes?*/,juego=false /*estamos jugando?*/;
+
+ALLEGRO_FONT* font; // fuente default
+ALLEGRO_FONT* font_logo; // fuente mas grande, usada para el logo
+
+
+/* IMAGENES */
 ALLEGRO_BITMAP* fondo; // para el juego
 ALLEGRO_BITMAP* menu; // para el inicio
-ALLEGRO_BITMAP* logo;
 ALLEGRO_BITMAP* balas;
+/* TEMPORIZADOR O RELOJ*/
 ALLEGRO_TIMER* timer; // el reloj del juego | en vez de usar time.h usamos allegro
+/* COLA DE EVENTOS */
 ALLEGRO_EVENT_QUEUE* queue; // la cola para los eventos
+/* PANTALLA */
 ALLEGRO_DISPLAY* disp; // pantalla
+/* ARCHIVO DE CONFIGURACION */
 ALLEGRO_CONFIG* cfg; // archivo de configuracion
+/* SONIDOS */
 ALLEGRO_SAMPLE* laser;
 ALLEGRO_SAMPLE* colision_laser;
 ALLEGRO_SAMPLE* notificacion;
 ALLEGRO_SAMPLE* colision_asteroide;
-int frame; // variable de debug | nos ayuda a filtrar eventos por tiempo
+ALLEGRO_SAMPLE* colision_nave;
+
+
+/* --- COSAS DE JUEGO --- */
 const int VIDAS = 5, X =640/2, Y=480/2; // variables para modificar cosas esenciales de la nave
-int ronda=0, asteroidesCreados=0; // asteroides creados por ronda
-bool asteroidesRonda=false, alienronda=false;
+
+
+int frame=0, segs=0; // variables de debug para la partida | nos ayuda a filtrar eventos por tiempo
+int ronda=0; // asteroides creados por ronda
 
 // cosas de asteroides
-char asteroideImagenes[][28] = { "resources/asteroide1.png","resources/asteroide2.png","resources/asteroide3.png" }; // las quiero cambiar por la dimensiones
+char asteroideImagenes[3][28] = { "resources/asteroide1.png","resources/asteroide2.png","resources/asteroide3.png" };
 const int tamAsteroide1 = 32; // dimensiones cuadradas de asteroides
 const int tamAsteroide2 = 64;
 const int tamAsteroide3 = 128;
+int asteroidesCreados=0;
+bool asteroidesRonda=false;
 
 //cosas de nave alien
 const int anchoalien=128, altoalien=64;
+bool alienronda=false;
 
 int score, hiscore; // PUNTAJE PARA LA PARTIDA)
 
 // prototipos de funciones
-void coords();
-void eventos(ALLEGRO_EVENT event);
-void iniciarNave();
-int moverNave(ALLEGRO_EVENT event );
-int aleatorioEntre(int lo, int hi);
-bool colision(int ax1, int ay1, int ax2, int ay2, int bx1, int by1, int bx2, int by2);
-float aleatorioEntreF(float lo, float hi);
-void eventosJuego(ALLEGRO_EVENT event);
 
 
 /* -------------- ESTRUCTURAS ----------------- */
@@ -107,7 +111,8 @@ struct ANIMACION {
     bool activo;
 };
 
-/* --------- DEFINICION DE ESTRUCTURAS -----------*/
+/* --------- DECLARACION DE ESTRUCTURAS -----------*/
+
 struct DISPARO disparos[OBJETO_MAX];
 struct ASTEROIDE asteroides[OBJETO_MAX];
 struct NAVE nave;
@@ -125,9 +130,11 @@ float aleatorioEntreF(float lo, float hi)
     return lo + ((float)rand() / (float)RAND_MAX) * (hi - lo);
 }
 
-/*----------- MECANICA DE COLISION ------------------ */
 bool colision(int ax1, int ay1, int ax2, int ay2, int bx1, int by1, int bx2, int by2)
 {
+
+
+
     if(ax1 > bx2) return false;
     if(ax2 < bx1) return false;
     if(ay1 > by2) return false;
@@ -137,20 +144,37 @@ bool colision(int ax1, int ay1, int ax2, int ay2, int bx1, int by1, int bx2, int
 }
 /* COSAS POR INICIAR Y DESTRUIR!! */
 void inicializar() {
-    al_init();
-    al_install_keyboard();
-    al_init_font_addon();
-    al_init_image_addon();
-    al_init_primitives_addon();
-    al_init_ttf_addon();
-    al_install_audio();
-    al_init_acodec_addon();
-    al_reserve_samples(16);
+    debeIniciar(al_init(), "Allegro");
+    debeIniciar(al_install_keyboard(), "Teclado");
+    debeIniciar(al_init_font_addon(), "Complemento de Fuentes");
+    debeIniciar(al_init_image_addon(), "Complemento de Imagenes");
+    debeIniciar(al_init_primitives_addon(), "Complemento de primitivos");
+    debeIniciar(al_init_ttf_addon(), "Complemento para Fuentes TTF");
+    debeIniciar(al_install_audio(), "Audio");
+    debeIniciar(al_init_acodec_addon(), "Codec de Audio");
+    debeIniciar(al_reserve_samples(16), "Reservacion de memoria para audios");
+     // maximos sonidos
     cfg = al_load_config_file("config.cfg");
+    if(cfg==NULL) { exit(1); printf("No se pudo iniciar la configuración"); }
     al_set_new_display_option(ALLEGRO_SAMPLE_BUFFERS, 1, ALLEGRO_SUGGEST);
     al_set_new_display_option(ALLEGRO_SAMPLES, 8, ALLEGRO_SUGGEST);
     al_set_new_bitmap_flags(ALLEGRO_MIN_LINEAR | ALLEGRO_MAG_LINEAR);
 
+
+}
+
+void debeIniciar(bool respuesta, char nombre[]) {
+    switch(respuesta){
+        case true:
+            printf("Se cargo %s\n", nombre);
+        break;
+
+        case false:
+            printf("No se pudo iniciar/cargar %s", nombre);
+            exit(1);
+        break;
+
+    }
 
 }
 
@@ -168,7 +192,6 @@ void destruir() {
     al_destroy_bitmap(menu);
     al_destroy_bitmap(balas);
     al_destroy_bitmap(alien.BITMAP);
-    al_destroy_bitmap(logo);
     al_destroy_display(disp);
     al_destroy_timer(timer);
     al_destroy_event_queue(queue);
@@ -203,17 +226,32 @@ void cargarBM() {
     menu = al_load_bitmap("resources/menu/fondo.png");
     balas = al_load_bitmap("resources/disparo.png");
     alien.BITMAP = al_load_bitmap("resources/alien.png");
+    nave.BITMAP = al_load_bitmap("resources/nave.png");
+    if(fondo==NULL || menu==NULL || balas==NULL || alien.BITMAP==NULL || nave.BITMAP ==NULL){
+        printf("No se pudieron cargar las imagenes!\n");
+        exit(1);
+    }
 }
 
 void cargarFuentes() {
     font = al_load_ttf_font("resources/fuentes/PressStart2P-vaV7.ttf", 10, 0); // aqui se define el fondo para impresion de cosas como debug y marcados
     font_logo = al_load_ttf_font("resources/fuentes/PressStart2P-vaV7.ttf", 28, 0); // aqui se define el fondo para impresion de cosas como debug y marcados
+    if(font==NULL || font_logo==NULL){
+        printf("No se pudieron cargar las fuentes!\n");
+        exit(1);
+    }
+
 }
 void cargarSonidos() {
     laser = al_load_sample("resources/sounds/laser.wav");
     colision_laser =  al_load_sample("resources/sounds/colision_laser.wav");
-    notificacion =  al_load_sample("resources/sounds/colision_laser.wav");
+    notificacion =  al_load_sample("resources/sounds/notificacion.wav");
     colision_asteroide = al_load_sample("resources/sounds/colision_asteroide.wav");
+    colision_nave = al_load_sample("resources/sounds/colision_nave.wav");
+    if(laser==NULL || colision_laser==NULL || notificacion==NULL || colision_asteroide==NULL || colision_nave==NULL){
+        printf("No se pudieron cargar los sonidos!\n");
+        exit(1);
+    }
 }
 
 /* CREAR ANIMACIONES */
@@ -251,9 +289,12 @@ void reproducirAnimaciones(){
     }
 }
 
-void cargarNuevoLogo() {
-    logo = al_load_bitmap(logos[aleatorioEntre(0,5)]);
+void reiniciarAnimaciones(){
+     for(int i=0;i<OBJETO_MAX;i++) {
+        animaciones[i].activo=false;
+     }
 }
+
 
 
 /* CREAR BICHOS */
@@ -288,6 +329,7 @@ void controlarAlien() {
                     case true:
                         // colision entre disparo de jugador y nave alien
                         if(colision(disparos[i].coords[0][0], disparos[i].coords[0][1],disparos[i].coords[1][0],disparos[i].coords[1][1], alien.x, alien.y, alien.x+anchoalien, alien.y+altoalien)) {
+                            al_play_sample(colision_nave,0.05,1.0,2.0,ALLEGRO_PLAYMODE_ONCE,0); // sonido
                             alien.vida--;
                             disparos[i].activo = false;
                         }
@@ -295,6 +337,7 @@ void controlarAlien() {
                     case false:
                         // colision entre disparo de alien con nave
                         if(colision(disparos[i].coords[0][0], disparos[i].coords[0][1],disparos[i].coords[1][0],disparos[i].coords[1][1], nave.coords[0][0], nave.coords[0][1], nave.coords[1][0], nave.coords[1][1])) {
+                            al_play_sample(colision_nave,0.05,1.0,2.0,ALLEGRO_PLAYMODE_ONCE,0); // sonido
                             nave.vidas--;
                             disparos[i].activo = false;
                         break;
@@ -313,9 +356,15 @@ void imprimirAlien() {
     }
 }
 
+void reiniciarAlien(){
+    alien.vida=0;
+    alien.dir=0;
+    alienronda=false;
+}
+
 int main()
 {
-
+    /* ----- CARGAR COSAS GENERALES ------ */
     inicializar();
     timer = al_create_timer(1.0 / FPS); // FPS
     queue = al_create_event_queue();
@@ -325,41 +374,102 @@ int main()
     ALLEGRO_EVENT event; // acceder a estructura evento
     cargarBM(); // cargar imagenes estaticas
     cargarSonidos();
-    iniciarNave(); // se inician coordenadas, bitmap, etc de la nave
 
-    al_start_timer(timer); // antes de iniciar
+
+    al_start_timer(timer); // antes de iniciar encender contador
     int fotogramasMenu=0, segsmenu;
-    cargarNuevoLogo();
     int colores[5][3] = {{0,255,191},{0,191,255},{191,0,255},{255,255,0},{255,64,0}}, color;
-    while (!juego) { // parte del menu
+    int pantalla=0;
+    while (ciclar) { // parte del menu
 
         al_wait_for_event(queue, &event);
         if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
-            if(event.keyboard.keycode == ALLEGRO_KEY_ENTER)
+            if(event.keyboard.keycode == ALLEGRO_KEY_ENTER) // ENTRAR AL JUEGO!
             {
-                juego = true;
-                break;
+                /* ----- CARGAR COSAS DE PARTIDA ------ */
+                memset(key,0,sizeof(key)); // mapear teclas
+                juego = true; // decir que se cicle
+                ronda = 1; // que sea la primera ronda
+                score=0; // iniciar en cerios
+                reiniciarAlien(); // reiniciar nave alienigena
+                reiniciarAnimaciones(); // matar animaciones
+                reiniciarAsteroides();  // matar asteroides
+                reiniciarDisparos(); // poner todos los disparos como inactivos
+                reiniciarNave(); // se inician-reinician coordenadas, bitmap, etc de la nave
+                cargarPuntajeMax(); // cargar puntaje maximo desde config
+                frame=0;
+                segs=0; // Iniciar tiempos nuevos!
+                while(juego && nave.vidas>0)
+                {
+                    al_wait_for_event(queue, &event);
+                    /* IMPORTANTES PUESTO NOS AYUDAN A SABER QUE SUCEDE CON EL TECLADO */
+                    eventosJuego(event);
+                    moverNave(event);
+
+
+                    if(redraw && al_is_event_queue_empty(queue)) //si no hay evento en cola y se pidió que se dibujara entonces:
+                    {
+                        al_clear_to_color(al_map_rgb(0, 0, 0)); // borrar contenido anterior
+                        // imprimir
+                        al_draw_bitmap(fondo, 0, 0, 0);
+                        al_draw_bitmap(nave.BITMAP, nave.coords[0][0], nave.coords[0][1],0); // dibujar nave
+                        if(hitbox) { al_draw_filled_rectangle(nave.coords[0][0],nave.coords[0][1],nave.coords[1][0],nave.coords[1][1],al_map_rgba_f(0, 0, 0.5, 0.5)); }
+                        dibujarDisparos(); // dibujar disparos vivos
+                        dibujarAsteroides(); // dibujar asteroides vivo
+                        reproducirAnimaciones();
+                        imprimirAlien(); // dibujar alien
+                        imprimirMarcador(); // imprimir marcador de vidas, puntaje, blabla
+                        if(debug) { coordsDebug();} // debug
+                        al_flip_display(); // aplicar cambiosssss
+                        redraw = false;
+                    }
+                }
+                guardarPuntaje();
+                // PANTALLA DE GAMEOVER!!!!
+            } else if(event.keyboard.keycode == ALLEGRO_KEY_DELETE) {
+                pantalla=1;
+            } else if (event.keyboard.keycode == ALLEGRO_KEY_ESCAPE){
+                if(pantalla==0){
+                    break;
+                } else if(pantalla==1) {
+                    pantalla=0;                }
             }
+
 
         } else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             break;
+
         } else if (event.type == ALLEGRO_EVENT_TIMER){
 
-            {
+            if(pantalla==0) {
+                al_clear_to_color(al_map_rgb(0, 0, 0)); // borrar contenido anterior
                 al_draw_bitmap(menu,0,0,0); // dibujar fondo menu
                 /*al_draw_bitmap(logo,200,100,0); // dibujar*/
+                al_draw_rectangle(5,5,635,475,al_map_rgb(colores[color][0],colores[color][1],colores[color][2]),1.0);
+                al_draw_rectangle(10,10,630,470,al_map_rgb(colores[color][0],colores[color][1],colores[color][2]),1.0);
                 al_draw_text(font_logo, al_map_rgb(colores[color][0],colores[color][1],colores[color][2]), 172,102,0,"AsteroidesC");
                 al_draw_text(font_logo, al_map_rgb(255,255,255), 170,100,0,"AsteroidesC");
                 al_draw_text(font, al_map_rgb(colores[color][0],colores[color][1],colores[color][2]), 200,300,0,"1. Iniciar Juego (ENTER)");
-                al_draw_text(font, al_map_rgb(colores[color][0],colores[color][1],colores[color][2]), 200,340,0,"2. Mejores puntajes");
+                al_draw_text(font, al_map_rgb(colores[color][0],colores[color][1],colores[color][2]), 200,340,0,"2. Mejores puntajes (SUPR)");
                 al_flip_display(); // se aplican cambios en la pantalla
+            } else if(pantalla==1){
+                al_clear_to_color(al_map_rgb(0, 0, 0)); // borrar contenido anterior
+                al_draw_text(font_logo, al_map_rgb(colores[color][0],colores[color][1],colores[color][2]), 122,102,0,"Mejores Puntajes");
+                al_draw_text(font_logo, al_map_rgb(255,255,255), 120,100,0,"Mejores Puntajes");
+                char hi[10];
+                cargarPuntajeMax();itoa(hiscore,hi,10);// cargar maximo
+                char his[15]; strcpy(his, "1. "); strcat(his, hi);
+                al_draw_text(font, al_map_rgb(255,255,255), 280,220,0,his);
+                al_draw_text(font, al_map_rgb(255,255,255), 20,460,0,"< Regresar (ESC)");
+                al_flip_display(); // aplicar cambiosssss
             }
+
+
 
             srand(time(NULL));
             fotogramasMenu++;
             if(fotogramasMenu/FPS==1 && fotogramasMenu%FPS==0) { // un segundo
                 color = aleatorioEntre(0,5);
-                cargarNuevoLogo();
                 segsmenu++;
                 fotogramasMenu=0;
             }
@@ -367,39 +477,11 @@ int main()
         }
 
     }
-    ronda = 1;
-    memset(key,0,sizeof(key));
-    reiniciarDisparos(); // poner todos los disparos como inactivos
-    cargarPuntajeMax(); // cargar puntaje maximo desde config
 
-    while(juego && nave.vidas>0)
-    {
-        al_wait_for_event(queue, &event);
-        /* IMPORTANTES PUESTO NOS AYUDAN A SABER QUE SUCEDE CON EL TECLADO */
-        eventosJuego(event);
-        moverNave(event);
-
-
-        if(redraw && al_is_event_queue_empty(queue)) //si no hay evento en cola y se pidió que se dibujara entonces:
-        {
-            al_clear_to_color(al_map_rgb(0, 0, 0)); // borrar contenido anterior
-            // imprimir
-            al_draw_bitmap(fondo, 0, 0, 0);
-            al_draw_bitmap(nave.BITMAP, nave.coords[0][0], nave.coords[0][1],0); // dibujar nave
-            if(hitbox) { al_draw_filled_rectangle(nave.coords[0][0],nave.coords[0][1],nave.coords[1][0],nave.coords[1][1],al_map_rgba_f(0, 0, 0.5, 0.5)); }
-            dibujarDisparos(); // dibujar disparos vivos
-            dibujarAsteroides(); // dibujar asteroides vivo
-            reproducirAnimaciones();
-            imprimirAlien(); // dibujar alien
-            imprimirMarcador(); // imprimir marcador de vidas, puntaje, blabla
-            if(debug) { coordsDebug();} // debug
-            al_flip_display(); // aplicar cambiosssss
-            redraw = false;
-        }
-    }
-    guardarPuntaje();
+    /* ----- DESTRUIR TODO! ------ */
     destruir();
     return 0;
+
 }
 
 void coordsDebug() {
@@ -412,14 +494,13 @@ void coordsDebug() {
 
 }
 
-void iniciarNave() {
+void reiniciarNave() {
     // Punto de impresion A
     nave.coords[0][0] = X;
     nave.coords[0][1] = Y;
     // Punto finalizado de impresion (B)
     nave.coords[1][0] = nave.coords[0][0]+64;
     nave.coords[1][1] = nave.coords[0][1]+64;
-    nave.BITMAP = al_load_bitmap("resources/nave.png");
     nave.vidas=VIDAS;
 }
 
@@ -504,21 +585,26 @@ void crear_asteroide(int vida, int posY, int posX, int velocidad) {
             break;
     }
     if(posX>xmax) { posX = xmax;}
+    if(posX<0) {posX=0;}
     for(int i=0;i<OBJETO_MAX;i++) {
         if(asteroides[i].vida==0) { // casilla con un asteroide ya muerto?? entonces lo revivimos
             asteroides[i].vida = vida;
             asteroides[i].posX = posX;
             asteroides[i].posY = posY;
-            if (velocidad>5) {velocidad=5;}
+            if (velocidad>5) {velocidad=5;} // limite de velocidad
             asteroides[i].velocidad = velocidad;
             asteroides[i].BITMAP = al_load_bitmap(asteroideImagenes[vida-1]);
+            if(asteroides[i].BITMAP==NULL){
+                printf("No se encontró alguna textura de los asteroides (se cargan en el transcurso del juego!)");
+                exit(1);
+            }
             break; // nomas creamos un asteroide!!
         }
     }
 }
 
 // modifica las posiciones para que el asteroide avance
-void control_asteroide() {
+void controlarAsteroide() {
 
     for (int i = 0; i < OBJETO_MAX; i++) {
         // si la vida del asteroide es mayor a 0 se mueve de posicion
@@ -569,12 +655,12 @@ void control_asteroide() {
                                 break;
 
                         }
-                        if (asteroides[i].vida>0) {
+                        if (asteroides[i].vida>1) {
                             crear_asteroide(asteroides[i].vida - 1, asteroides[i].posY, asteroides[i].posX+64, ronda);
                             crear_asteroide(asteroides[i].vida - 1, asteroides[i].posY, asteroides[i].posX-64, ronda);
                         }
                         asteroides[i].vida = 0;
-                        if(asteroidesCreados/(ronda*20)==1 && asteroidesCreados%(ronda*20)==0) { ronda++; } // cambiar de ronda
+                        //if(asteroidesCreados/(ronda*20)==1 && asteroidesCreados%(ronda*20)==0) { ronda++; } // cambiar de ronda
                         break; // encontró colision? ya no hay que comprobar más disparos
                     }
                 }
@@ -623,6 +709,13 @@ void dibujarAsteroides(){
             if (hitbox) { al_draw_filled_rectangle(asteroides[i].posX, asteroides[i].posY,ancho,alto,al_map_rgba_f(0, 0, 0.5, 0.5));}
         }
     }
+}
+
+void reiniciarAsteroides(){
+    for(int i =0;i<OBJETO_MAX;i++) {
+        asteroides[i].vida = 0;
+    }
+
 }
 
 void comprobarRonda() {
@@ -726,12 +819,22 @@ void imprimirMarcador() {
     hiscore<score ? strcpy(puntmax, puntos) : sprintf(puntmax,"%i", hiscore);
     char rond[7];
     sprintf(rond,"%i", ronda);
+    char tiempo[6];
+    if(segs%60<10) {
+        sprintf(tiempo,"%i:0%i", segs/60, segs%60);
+    } else {
+         sprintf(tiempo,"%i:%i", segs/60, segs%60);
+    }
+
+
     al_draw_text(font, al_map_rgb(255,255,255), 20,10,0,"PUNTAJE");
     al_draw_text(font, al_map_rgb(255,255,255), 20,30,0,puntos);
     al_draw_text(font, al_map_rgb(255,255,255), 100,10,0,"PUNTAJE MA.");
     al_draw_text(font, al_map_rgb(255,255,255), 100,30,0, puntmax);
     al_draw_text(font, al_map_rgb(255,255,255), 230,10,0,"RONDA");
     al_draw_text(font, al_map_rgb(255,255,255), 230,30,0, rond);
+    al_draw_text(font, al_map_rgb(255,255,255), 320,10,0,"TIEMPO");
+    al_draw_text(font, al_map_rgb(255,255,255), 320,30,0, tiempo);
     al_draw_text(font, al_map_rgb(255,255,255), 20,50,0,"VIDAS");
     for(int i=0;i<nave.vidas;i++) {
         al_draw_text(font_logo, al_map_rgb(199, 0, 57), 20 +i*30,70,0,"♥");
@@ -749,7 +852,6 @@ void eventosJuego(ALLEGRO_EVENT event) {
             }
 
             frame++;
-            static int segs;
             if(frame%FPS==0) { // cada segundo (SEGUN LA EJECUCION!) Puede variar en respuesta de la computadora...
                 segs++;
 
@@ -764,16 +866,16 @@ void eventosJuego(ALLEGRO_EVENT event) {
                         asteroidesCreados=0;
                         asteroidesRonda=true; // marcamos como que ya se imprimieron los que deberian imprimirse
                     }
-                    printf("Asteroides creados: %i", asteroidesCreados);
+                    if (debug) { printf("Asteroides creados: %i\n", asteroidesCreados); }
                 }
                 if(debug){
-                    printf("%i s", segs);
+                    printf("%i s\n", segs);
                 }
                 disparar(false);//disparar alien
 
             }
             //comprobar ciertas cosas (colisiones y salidas de objetos de mapa)
-            control_asteroide();
+            controlarAsteroide();
             controlarAlien();
             comprobarDisparos();
             comprobarRonda();
@@ -797,7 +899,8 @@ void eventosJuego(ALLEGRO_EVENT event) {
             key[event.keyboard.keycode] &= KEY_RELEASED;
             break;
         case ALLEGRO_EVENT_DISPLAY_CLOSE:
-            juego =!juego;
+            juego = false;
+            ciclar = false;
             break;
 
     }

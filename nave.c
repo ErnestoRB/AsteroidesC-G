@@ -214,6 +214,12 @@ void iniciarMandos() {
     if(al_get_num_joysticks()>0) {
         printf("Se han detectado %i mandos\n", al_get_num_joysticks());
         mando = al_get_joystick(0);
+    } else {
+        printf("No se han detectado mandos");
+        if(tipo_control==JOYSTICK) {
+            exit(1);
+        }
+
     }
 
 }
@@ -469,26 +475,54 @@ void reiniciarNave() {
     nave.vidas=VIDAS;
 }
 
-int moverNave(ALLEGRO_EVENT event ) {
+int moverNave(ALLEGRO_EVENT event) {
         static int val;
         ALLEGRO_JOYSTICK_STATE estado;
-        al_get_joystick_state(mando,&estado);
-        switch(event.type) {
-            case ALLEGRO_EVENT_TIMER:
-                if(key[ALLEGRO_KEY_UP] || key[ALLEGRO_KEY_W] || estado.stick[0].axis[1]<0)
-                    if (val!=5&&val!=2&&val!=8)
-                        nave.coords[0][1]-=8;
-                if(key[ALLEGRO_KEY_DOWN]|| key[ALLEGRO_KEY_S] || estado.stick[0].axis[1]>0)
-                    if (val!=4&&val!=7&&val!=6)
-                        nave.coords[0][1]+=8;
-                if(key[ALLEGRO_KEY_LEFT]|| key[ALLEGRO_KEY_A]||estado.stick[0].axis[0]<0)
-                    if (val!=5&&val!=1&&val!=6)
-                        nave.coords[0][0]-=8;
-                if(key[ALLEGRO_KEY_RIGHT] || key[ALLEGRO_KEY_D]||estado.stick[0].axis[0]>0)
-                    if (val!=3&&val!=7&&val!=8)
-                        nave.coords[0][0]+=8;
-               break;
+
+        switch(tipo_control) {
+            case JOYSTICK:
+                al_get_joystick_state(mando,&estado);
+                switch(event.type) {
+                    case ALLEGRO_EVENT_TIMER:
+                        if(estado.stick[0].axis[1]<0)
+                            if (val!=5&&val!=2&&val!=8)
+                                nave.coords[0][1]-=8;
+                        if(estado.stick[0].axis[1]>0)
+                            if (val!=4&&val!=7&&val!=6)
+                                nave.coords[0][1]+=8;
+                        if(estado.stick[0].axis[0]<0)
+                            if (val!=5&&val!=1&&val!=6)
+                                nave.coords[0][0]-=8;
+                        if(estado.stick[0].axis[0]>0)
+                            if (val!=3&&val!=7&&val!=8)
+                                nave.coords[0][0]+=8;
+                       break;
+                }
+                break;
+            case TECLADO:
+                switch(event.type) {
+                    case ALLEGRO_EVENT_TIMER:
+                        if(key[ALLEGRO_KEY_UP] || key[ALLEGRO_KEY_W])
+                            if (val!=5&&val!=2&&val!=8)
+                                nave.coords[0][1]-=8;
+                        if(key[ALLEGRO_KEY_DOWN]|| key[ALLEGRO_KEY_S])
+                            if (val!=4&&val!=7&&val!=6)
+                                nave.coords[0][1]+=8;
+                        if(key[ALLEGRO_KEY_LEFT]|| key[ALLEGRO_KEY_A])
+                            if (val!=5&&val!=1&&val!=6)
+                                nave.coords[0][0]-=8;
+                        if(key[ALLEGRO_KEY_RIGHT] || key[ALLEGRO_KEY_D])
+                            if (val!=3&&val!=7&&val!=8)
+                                nave.coords[0][0]+=8;
+                       break;
+                }
+                break;
+            case MOUSE:
+                break;
         }
+
+
+
 
         nave.coords[1][0] = nave.coords[0][0] + 64;
         nave.coords[1][1] = nave.coords[0][1] + 64;
@@ -530,8 +564,6 @@ int moverNave(ALLEGRO_EVENT event ) {
         } else {
             val=0;
         }
-
-
         return val;
 
 }

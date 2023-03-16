@@ -1217,8 +1217,9 @@ int main()
                     tipo_control = JOYSTICK;
                 }
                 char modo[2];
+                intToString(tipo_control, modo);
 
-                al_set_config_value(cfg, "input", "mode", itoa(tipo_control, modo, 10));
+                al_set_config_value(cfg, "input", "mode", modo);
                 al_save_config_file("config.cfg", cfg);
             }
         }
@@ -1246,7 +1247,7 @@ int main()
                 al_draw_text(font_logo, al_map_rgb(255, 255, 255), 120, 100, 0, al_get_config_value(lang, "other_menus", "best_scores"));
                 char hi[10];
                 cargarPuntajeMax();
-                itoa(hiscore, hi, 10); // cargar maximo
+                intToString(hiscore,hi);
                 char his[15];
                 strcpy(his, "1. ");
                 strcat(his, hi);
@@ -1295,4 +1296,8 @@ int main()
     /* ----- DESTRUIR TODO! ------ */
     destruir();
     return 0;
+}
+
+void intToString (int numero, char* cadena) {
+    sprintf(cadena,"%d",numero);
 }

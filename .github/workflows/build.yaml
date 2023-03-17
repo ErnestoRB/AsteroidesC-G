@@ -19,5 +19,5 @@ jobs:
           cmake --install ${{github.workspace}}/build
       - uses: actions/upload-artifact@v3
         with:
-          name: Asteroides-${{ github.sha }
+          name: Asteroides-${{ github.sha }}
           path: dist # or path/to/artifact

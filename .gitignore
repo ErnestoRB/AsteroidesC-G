@@ -1,2 +1,5 @@
+# CMake files
 build/
+# Binary files
+dist/
 .vscode
